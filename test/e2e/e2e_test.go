@@ -37,7 +37,7 @@ const namespace = "kubernetes-guestbook-operator-system"
 const serviceAccountName = "kubernetes-guestbook-operator-controller-manager"
 
 // metricsServiceName is the name of the metrics service of the project
-const metricsServiceName = "kubernetes-guestbook-operator-controller-manager-metrics-service"
+const metricsServiceName = "kubernetes-guestbook-operator-manager-metrics-service"
 
 // metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
 const metricsRoleBindingName = "kubernetes-guestbook-operator-metrics-binding"
