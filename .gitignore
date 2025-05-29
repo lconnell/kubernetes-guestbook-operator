@@ -2,6 +2,8 @@
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
 # Binaries for programs and plugins
+/bin/*
+!/bin/.gitkeep # Optional: if you want to keep the bin directory itself, but not its contents
 *.exe
 *.exe~
 *.dll
