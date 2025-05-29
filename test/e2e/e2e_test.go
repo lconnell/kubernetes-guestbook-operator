@@ -67,7 +67,12 @@ var _ = Describe("Manager", Ordered, func() {
 
 		By("deploying the controller-manager")
 		cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage))
-		_, err = utils.Run(cmd)
+		// Capture output along with the error
+		output, err := utils.Run(cmd)
+		if err != nil {
+			// Print the error and output to GinkgoWriter for visibility in CI logs
+			_, _ = fmt.Fprintf(GinkgoWriter, "Error during 'make deploy': %v\nCommand output:\n%s\n", err, string(output))
+		}
 		Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
 	})
 
