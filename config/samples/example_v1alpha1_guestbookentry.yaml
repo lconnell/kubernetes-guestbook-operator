@@ -1,0 +1,10 @@
+apiVersion: example.connell.com/v1alpha1
+kind: GuestbookEntry
+metadata:
+  labels:
+    app.kubernetes.io/name: kubernetes-guestbook-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: guestbookentry-sample
+spec:
+  name: "Test User"
+  message: "Hello from the guestbook operator!"
