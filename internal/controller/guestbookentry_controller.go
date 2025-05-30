@@ -31,6 +31,13 @@ import (
 	examplev1alpha1 "connell.com/guestbook-operator/api/v1alpha1"
 )
 
+const (
+	// PhaseError indicates that an error occurred during reconciliation.
+	PhaseError = "Error"
+	// PhaseProcessed indicates that the resource has been successfully processed.
+	PhaseProcessed = "Processed"
+)
+
 // GuestbookEntryReconciler reconciles a GuestbookEntry object
 type GuestbookEntryReconciler struct {
 	client.Client
@@ -53,8 +60,8 @@ type GuestbookEntryReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
 func (r *GuestbookEntryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
-	log.Info("Reconciling GuestbookEntry")
+	ctrlLog := log.FromContext(ctx)
+	ctrlLog.Info("Reconciling GuestbookEntry")
 
 	// 1. Fetch the GuestbookEntry instance
 	guestbookEntry := &examplev1alpha1.GuestbookEntry{}
@@ -63,11 +70,11 @@ func (r *GuestbookEntryReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			log.Info("GuestbookEntry resource not found. Ignoring since object must be deleted.")
+			ctrlLog.Info("GuestbookEntry resource not found. Ignoring since object must be deleted.")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get GuestbookEntry")
+		ctrlLog.Error(err, "Failed to get GuestbookEntry")
 		return ctrl.Result{}, err
 	}
 
@@ -87,12 +94,12 @@ func (r *GuestbookEntryReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// Set GuestbookEntry instance as the owner and controller
 	if err := ctrl.SetControllerReference(guestbookEntry, desiredConfigMap, r.Scheme); err != nil {
-		log.Error(err, "Failed to set controller reference on ConfigMap")
+		ctrlLog.Error(err, "Failed to set controller reference on ConfigMap")
 		// Update status and requeue
-		guestbookEntry.Status.Phase = "Error"
+		guestbookEntry.Status.Phase = PhaseError
 		guestbookEntry.Status.Message = "Failed to set owner reference for ConfigMap"
 		if statusUpdateErr := r.Status().Update(ctx, guestbookEntry); statusUpdateErr != nil {
-			log.Error(statusUpdateErr, "Failed to update GuestbookEntry status after owner ref error")
+			ctrlLog.Error(statusUpdateErr, "Failed to update GuestbookEntry status after owner ref error")
 		}
 		return ctrl.Result{}, err
 	}
@@ -101,60 +108,60 @@ func (r *GuestbookEntryReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	foundConfigMap := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: guestbookEntry.Namespace}, foundConfigMap)
 	if err != nil && apierrors.IsNotFound(err) {
-		log.Info("Creating a new ConfigMap", "ConfigMap.Namespace", desiredConfigMap.Namespace, "ConfigMap.Name", desiredConfigMap.Name)
+		ctrlLog.Info("Creating a new ConfigMap", "ConfigMap.Namespace", desiredConfigMap.Namespace, "ConfigMap.Name", desiredConfigMap.Name)
 		err = r.Create(ctx, desiredConfigMap)
 		if err != nil {
-			log.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", desiredConfigMap.Namespace, "ConfigMap.Name", desiredConfigMap.Name)
-			guestbookEntry.Status.Phase = "Error"
+			ctrlLog.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", desiredConfigMap.Namespace, "ConfigMap.Name", desiredConfigMap.Name)
+			guestbookEntry.Status.Phase = PhaseError
 			guestbookEntry.Status.Message = "Failed to create ConfigMap"
 			if statusUpdateErr := r.Status().Update(ctx, guestbookEntry); statusUpdateErr != nil {
-				log.Error(statusUpdateErr, "Failed to update GuestbookEntry status after CM create error")
+				ctrlLog.Error(statusUpdateErr, "Failed to update GuestbookEntry status after CM create error")
 			}
 			return ctrl.Result{}, err
 		}
 		// ConfigMap created successfully - update status and requeue to check later if needed
-		guestbookEntry.Status.Phase = "Processed"
+		guestbookEntry.Status.Phase = PhaseProcessed
 		guestbookEntry.Status.Message = "ConfigMap created successfully"
 		if err := r.Status().Update(ctx, guestbookEntry); err != nil {
-			log.Error(err, "Failed to update GuestbookEntry status")
+			ctrlLog.Error(err, "Failed to update GuestbookEntry status")
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil // Requeue to ensure status is updated and observed
 	} else if err != nil {
-		log.Error(err, "Failed to get ConfigMap")
+		ctrlLog.Error(err, "Failed to get ConfigMap")
 		return ctrl.Result{}, err
 	}
 
 	// 4. If ConfigMap already exists, check if it needs update
-	log.Info("ConfigMap already exists. Ensuring data is up-to-date.")
+	ctrlLog.Info("ConfigMap already exists. Ensuring data is up-to-date.")
 	if foundConfigMap.Data["name"] != desiredConfigMap.Data["name"] || foundConfigMap.Data["message"] != desiredConfigMap.Data["message"] {
-		log.Info("ConfigMap data out of sync, updating...")
+		ctrlLog.Info("ConfigMap data out of sync, updating...")
 		foundConfigMap.Data = desiredConfigMap.Data // Update data
 		err = r.Update(ctx, foundConfigMap)
 		if err != nil {
-			log.Error(err, "Failed to update existing ConfigMap")
-			guestbookEntry.Status.Phase = "Error"
+			ctrlLog.Error(err, "Failed to update existing ConfigMap")
+			guestbookEntry.Status.Phase = PhaseError
 			guestbookEntry.Status.Message = "Failed to update ConfigMap"
 			if statusUpdateErr := r.Status().Update(ctx, guestbookEntry); statusUpdateErr != nil {
-				log.Error(statusUpdateErr, "Failed to update GuestbookEntry status after CM update error")
+				ctrlLog.Error(statusUpdateErr, "Failed to update GuestbookEntry status after CM update error")
 			}
 			return ctrl.Result{}, err
 		}
-		log.Info("ConfigMap updated.")
-		guestbookEntry.Status.Phase = "Processed"
+		ctrlLog.Info("ConfigMap updated.")
+		guestbookEntry.Status.Phase = PhaseProcessed
 		guestbookEntry.Status.Message = "ConfigMap updated successfully"
 	} else {
-		log.Info("ConfigMap data is already in sync.")
-		guestbookEntry.Status.Phase = "Processed"
+		ctrlLog.Info("ConfigMap data is already in sync.")
+		guestbookEntry.Status.Phase = PhaseProcessed
 		guestbookEntry.Status.Message = "ConfigMap is in desired state"
 	}
 
 	if err := r.Status().Update(ctx, guestbookEntry); err != nil {
-		log.Error(err, "Failed to update GuestbookEntry status")
+		ctrlLog.Error(err, "Failed to update GuestbookEntry status")
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Successfully reconciled GuestbookEntry")
+	ctrlLog.Info("Successfully reconciled GuestbookEntry")
 	return ctrl.Result{}, nil
 }
 
